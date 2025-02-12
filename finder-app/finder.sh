@@ -2,11 +2,7 @@
 
 filesdir=$1
 searchstr=$2
-if [ -z $1 ] || [ -z $2 ]
-  then
-      echo "Error: Missing required arguments."
-      exit 1
-elif [ "$#" -ne 2 ]; then
+if [ "$#" -ne 2 ]; then
       echo "Error: Exactly 2 arguments are required."
       exit 1
 elif [ ! -d "$filesdir" ]
