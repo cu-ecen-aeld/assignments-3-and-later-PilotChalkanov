@@ -10,15 +10,7 @@ elif [ ! -d "$filesdir" ]
     echo "file $filesdir doesnt exist"
     exit 1
 else
-    files_cnt=0
-    match_count=0
-
-    for file in "$filesdir"/*; do
-            if [ -f "$file" ]; then
-                files_cnt=$((files_cnt + 1))
-                cnt_lines=$(grep -c "$searchstr" "$file")
-                match_count=$((match_count + cnt_lines))
-            fi
-        done
-    echo  "The number of files are $files_cnt and the number of matching lines are $cnt_lines"
+    files_cnt=$(find "$filesdir" -type f | wc -l)
+    lines_cnt=$(grep -Rl "$searchstr" "$filesdir" | wc -l)
+    echo  "The number of files are $files_cnt and the number of matching lines are $lines_cnt"
 fi
