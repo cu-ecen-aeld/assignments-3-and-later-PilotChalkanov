@@ -1,12 +1,13 @@
-CC = aarch64-none-linux-gnu-gcc
+CROSS_COMPILE ?=
+CC = $(CROSS_COMPILE)gcc
 CFLAGS = -g -Wall
-TARGET = writer.o
+TARGET = writer
 SRC = writer.c
 
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -c -o $(TARGET) $(SRC)
+	$(CC) $(CFLAGS) -g -o $(TARGET) $(SRC)
 
 clean:
 	rm -f $(TARGET)
