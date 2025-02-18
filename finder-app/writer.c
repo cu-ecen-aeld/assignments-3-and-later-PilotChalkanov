@@ -14,7 +14,7 @@
 
 void write_to_file(char* file_name, char* file_content){
   int fd;
-  fd = open(file_name, O_WRONLY | O_APPEND , S_IRUSR | S_IWUSR);
+  fd = open(file_name, O_WRONLY | O_APPEND , S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
   if (fd == -1){
     syslog(LOG_ERR, "Error opening file: %s", file_name);
     exit(1);
@@ -28,7 +28,7 @@ void write_to_file(char* file_name, char* file_content){
     return;
   }
 
-  syslog(LOG_INFO, "Successfully wrote to file: %s", file_name);
+  syslog(LOG_USER, "Successfully wrote to file: %s", file_name);
   close(fd);
   }
 
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
 
 if (argc != 3) {
         syslog(LOG_ERR, "Usage: %s <file_name> <file_content>", argv[0]);
-        return 1;
+        exit(1);
     }
 
     write_to_file(argv[1], argv[2]);
