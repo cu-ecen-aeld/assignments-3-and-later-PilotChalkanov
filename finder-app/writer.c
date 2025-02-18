@@ -12,31 +12,42 @@
 #include <unistd.h>
 
 
-void write_to_file(char* file_name, char* file_content){
-  int fd;
-  fd = open(file_name, O_WRONLY | O_APPEND , S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-  if (fd == -1){
-    syslog(LOG_ERR, "Error opening file: %s", file_name);
-    exit(1);
-  }
+int write_to_file(char* file_name, char* file_content)
+{
+    const int fd = open(file_name, O_WRONLY | O_APPEND | O_CREAT,
+                        S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    if (fd == -1)
+    {
+        syslog(LOG_ERR, "Error opening file: %s", file_name);
+        return 1;
+    }
 
 
-  ssize_t bytes_written = write(fd, file_content, strlen(file_content));
-  if (bytes_written == -1){
-    syslog(LOG_ERR, "Failed to write to file: %s", file_name);
-    close(fd);
-    return;
-  }
+    const ssize_t bytes_written = write(fd, file_content, strlen(file_content));
 
-  syslog(LOG_USER, "Successfully wrote to file: %s", file_name);
-  close(fd);
-  }
+    if (bytes_written == -1)
+    {
+        syslog(LOG_ERR, "Failed to write to file: %s", file_name);
+        close(fd);
+        return 1;
+    }
 
-int main(int argc, char *argv[]) {
+    syslog(LOG_USER, "Successfully wrote to file: %s", file_name);
+    if (close(fd) == -1)
+    {
+        syslog(LOG_ERR, "Error closing file: %s", file_name);
+        return 1;
+    }
+    return 0;
+}
 
-if (argc != 3) {
+int main(int argc, char* argv[])
+{
+    openlog(NULL, LOG_PID | LOG_NDELAY, LOG_USER);
+    if (argc != 3)
+    {
         syslog(LOG_ERR, "Usage: %s <file_name> <file_content>", argv[0]);
-        exit(1);
+        return 1;
     }
 
     write_to_file(argv[1], argv[2]);
