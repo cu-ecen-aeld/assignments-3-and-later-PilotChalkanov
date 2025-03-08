@@ -73,6 +73,9 @@ bool do_exec(int count, ...)
         else if (errno == ENOMEM) {
             perror("Error: fork() failed - insufficient kernel memory ");
         }
+        else {
+            perror("Error: fork() failed");
+        }
         va_end(args);
         return false;
     }
@@ -88,15 +91,20 @@ bool do_exec(int count, ...)
             perror("Error: execv() failed");
             exit(EXIT_FAILURE);
         }
-        va_end(args);
         return true;
     }
-    if (waitpid(pid, &status, 0) == -1) return false;
+    if (waitpid(pid, &status, 0) == -1) {
+        perror("Error: waitpid() failed");
+        va_end(args);
+        return false;
+    }
     if (WIFEXITED(status)) {
         printf ("Normal termination with exit status=%d\n",
                         WEXITSTATUS (status));
+        va_end(args);
         return true;
     }
+    va_end(args);
     return false;
 
 
