@@ -1,7 +1,9 @@
 #include "systemcalls.h"
-
+#include <sys/wait.h>
 #include <stdlib.h>
-
+#include <errno.h>
+#include <sys/types.h>
+#include <unistd.h>
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -40,6 +42,7 @@ bool do_system(const char *cmd)
 
 bool do_exec(int count, ...)
 {
+    int status;
     va_list args;
     va_start(args, count);
     char * command[count+1];
@@ -51,7 +54,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 /*
  * TODO:
@@ -62,10 +65,41 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t pid = fork();
+    if (pid == -1) {
+        if (errno == EAGAIN) {
+            perror("Error: fork() failed due to resource allocation failure - rlimit reached");
+        }
+        else if (errno == ENOMEM) {
+            perror("Error: fork() failed - insufficient kernel memory ");
+        }
+        va_end(args);
+        return false;
+    }
 
-    va_end(args);
+    /*
+     *child process handling
+     */
+    if (pid == 0) {
+        // char *comm_for_exec = command[0];
+        // char **comm_args = command;
+        int ret = execv("/bin/sh", command);
+        if (ret == -1) {
+            perror("Error: execv() failed");
+            exit(EXIT_FAILURE);
+        }
+        va_end(args);
+        return true;
+    }
+    if (waitpid(pid, &status, 0) == -1) return false;
+    if (WIFEXITED(status)) {
+        printf ("Normal termination with exit status=%d\n",
+                        WEXITSTATUS (status));
+        return true;
+    }
+    return false;
 
-    return true;
+
 }
 
 /**
