@@ -147,7 +147,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
         case 0:
             if (dup2(fd, 1) < 0) { perror("dup2"); abort(); }
         close(fd);
-        do_exec(command); perror("do_exec"); abort();
+        do_exec(count, command); perror("do_exec"); abort();
         default:
             close(fd);
         /* do whatever the parent wants to do. */
