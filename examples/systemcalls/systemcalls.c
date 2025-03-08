@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -128,7 +129,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 
 /*
@@ -138,6 +139,19 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    int child_pid;
+    const int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0) { perror("open"); abort(); }
+    switch (child_pid = fork()) {
+        case -1: perror("fork"); abort();
+        case 0:
+            if (dup2(fd, 1) < 0) { perror("dup2"); abort(); }
+        close(fd);
+        do_exec(command); perror("do_exec"); abort();
+        default:
+            close(fd);
+        /* do whatever the parent wants to do. */
+    }
 
     va_end(args);
 
