@@ -107,6 +107,6 @@ sudo chown -R root:root "${OUTDIR}/rootfs"
 
 # Create initramfs.cpio.gz
 cd "${OUTDIR}/rootfs"
-find .| cpio -H newc -ov --owner root:root > "${OUTDIR}/initramfs.cpio"
+find . | cpio -H newc -ov --owner root:root > "${OUTDIR}/initramfs.cpio"
 cd "${OUTDIR}" & ls
 gzip -f initramfs.cpio
