@@ -45,7 +45,7 @@ fi
 # Copy resulting files generated in step 1.c to outdir
 echo "Adding the Image in outdir"
 ls -al
-cp "${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image" ${OUTDIR}
+cp "${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image" "${OUTDIR}/Image"
 
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
