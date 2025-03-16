@@ -38,7 +38,7 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
     make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
     make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all
-    make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
+#    make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
     make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
 fi
 
@@ -79,11 +79,22 @@ echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
-# TODO: Add library dependencies to rootfs
+# Add library dependencies to rootfs
+TCHAIN_SYS_ROOT=$(aarch64-none-linux-gnu-gcc  -print-sysroot)
 
-# TODO: Make device nodes
+cp "$TCHAIN_SYS_ROOT/lib/ld-linux-aarch64.so.1" "${OUTDIR}/rootfs/lib/"
+cp "$TCHAIN_SYS_ROOT/lib64/libc.so.6" "${OUTDIR}/rootfs/lib64/"
+cp "$TCHAIN_SYS_ROOT/lib64/libresolv.so.2" "${OUTDIR}/rootfs/lib64/"
+cp "$TCHAIN_SYS_ROOT/lib64/libm.so.6" "${OUTDIR}/rootfs/lib64/"
 
-# TODO: Clean and build the writer utility
+# Make device nodes
+sudo mknod -m 666 dev/null c 1 3
+sudo mknod -m 600 dev/console c 5 1
+
+# Clean and build the writer utility
+cd "${FINDER_APP_DIR}"
+make clean
+make CROSS_COMPILE=${CROSS_COMPILE}
 
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
