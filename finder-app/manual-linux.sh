@@ -42,7 +42,9 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
 fi
 
+# Copy resulting files generated in step 1.c to outdir
 echo "Adding the Image in outdir"
+ls -al
 
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
