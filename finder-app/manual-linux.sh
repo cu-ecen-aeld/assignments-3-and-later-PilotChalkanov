@@ -44,9 +44,8 @@ fi
 
 # Copy resulting files generated in step 1.c to outdir
 echo "Adding the Image in outdir"
-ls -al
 cp "${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image" "${OUTDIR}/Image"
-
+ls -al
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
 if [ -d "${OUTDIR}/rootfs" ]
@@ -112,5 +111,6 @@ sudo chown -R root:root "${OUTDIR}/rootfs"
 cd "${OUTDIR}/rootfs"
 find . | cpio -H newc -ov --owner root:root > "${OUTDIR}/initramfs.cpio"
 cd "${OUTDIR}"
-ls -al
 gzip -f initramfs.cpio
+echo "Checking outdir content"
+ls -al
