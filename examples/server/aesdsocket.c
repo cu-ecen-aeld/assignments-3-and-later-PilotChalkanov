@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
     print_servinfo(servinfo);
 
     // SIGNAL handling
-    sa.sa_handler = signal_handler;
+    sa.sa_handler = &signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
