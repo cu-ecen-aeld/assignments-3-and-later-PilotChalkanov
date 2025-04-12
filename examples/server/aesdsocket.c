@@ -18,7 +18,14 @@
 #define FILEPATH "/var/tmp/aesdsocketdata"
 
 int sockfd;
+
+/**
+ *Prints the Protocol Family, IP and PORT
+ */
 void print_servinfo(struct addrinfo *servinfo) {
+    /**
+     *Prints the Protocol Family, IP and PORT
+     */
     struct addrinfo *p;
     char ipstr[INET_ADDRSTRLEN];
 
@@ -37,7 +44,10 @@ void print_servinfo(struct addrinfo *servinfo) {
     }
 }
 
-/* handler for SIGINT and SIGTERM */
+/*
+ * handler for SIGINT and SIGTERM
+ *
+ */
 void signal_handler(int signo){
     if (signo == SIGINT || signo == SIGTERM) {
         printf("Caught signal %d\n", signo);
@@ -54,11 +64,7 @@ void signal_handler(int signo){
 
 void *get_in_addr(struct sockaddr *sa)
 {
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+    return &((struct sockaddr_in*)sa)->sin_addr;
 }
 
 int write_to_file(char* file_name, char* file_content)
@@ -113,7 +119,7 @@ char* read_from_file(char* file_name) {
     }
 
     size_t file_size = st.st_size;
-    char *buf = (char *)malloc(file_size + 1); // Allocate memory for file content + null terminator
+    char *buf = (char *)malloc(file_size + 1);
     if (buf == NULL) {
         perror("Memory allocation failed");
         close(fd);
@@ -158,6 +164,9 @@ int main() {
 
     print_servinfo(servinfo);
 
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
 
@@ -217,6 +226,13 @@ int main() {
         printf("server: Accepted connection from %s\n", s);
         syslog(LOG_INFO, "server: Accepted connection from %s\n", s);
 
+        //makes the process daemonic
+        // if (daemon(0, 0) == -1) {
+        //     perror("daemon");
+        //     close(new_fd);
+        //     continue;
+        // }
+
         ssize_t bytes_received = recv(new_fd, buffer, BUFFER_SIZE - 1, 0);
         if (bytes_received > 0) {
             buffer[bytes_received] = '\0'; // Null-terminate the received data
@@ -233,6 +249,7 @@ int main() {
                 if (send(new_fd, buffer, strlen(buffer), 0) == -1) {
                     perror("send");
                 }
+                free(ret);
                 exit(0);
             } else if (pid < 0) {
                 perror("fork");
@@ -242,7 +259,6 @@ int main() {
         }
 
         close(new_fd);
+        return 0;
     }
-
-    return 0;
 }
