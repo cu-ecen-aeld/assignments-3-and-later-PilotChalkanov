@@ -12,6 +12,7 @@
 #include <syslog.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #define BACKLOG 10
 #define BUFFER_SIZE 1024
@@ -56,10 +57,18 @@ void signal_handler(int signo){
             printf("Socket closed successfully.\n");
         }
         exit(EXIT_SUCCESS);
-    } else {
-        fprintf(stderr, "Unexpected signal!\n");
-        exit(EXIT_FAILURE);
     }
+    if (signo == SIGCHLD) {
+        printf("Caught signal %d\n", signo);
+    }
+    if (signo == SIGSEGV) {
+        while (waitpid(-1, NULL, WNOHANG) > 0) {
+            printf("Handled SIGCHLD: Cleaned up a child process.\n");
+        }
+    }
+    fprintf(stderr, "Unexpected signal!\n");
+    exit(EXIT_FAILURE);
+
 }
 
 void *get_in_addr(struct sockaddr *sa)
@@ -164,11 +173,14 @@ int main() {
 
     print_servinfo(servinfo);
 
+    // SIGNAL handling
     sa.sa_handler = signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGCHLD, &sa, NULL);
+    sigaction(SIGSEGV, &sa, NULL);
 
     for (p = servinfo; p != NULL; p = p->ai_next) {
         sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
