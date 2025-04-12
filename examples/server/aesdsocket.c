@@ -18,7 +18,7 @@
 #define BUFFER_SIZE 1024
 #define FILEPATH "/var/tmp/aesdsocketdata"
 
-int sockfd;
+int sockfd = -1;
 
 /**
  *Prints the Protocol Family, IP and PORT
@@ -35,7 +35,7 @@ void print_servinfo(struct addrinfo *servinfo) {
         char *ipver;
         int port;
 
-        struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+        struct sockaddr_in *ipv4 = (struct sockaddr_in *) p->ai_addr;
         addr = &(ipv4->sin_addr);
         ipver = "IPv4";
         port = ntohs(ipv4->sin_port);
@@ -49,9 +49,10 @@ void print_servinfo(struct addrinfo *servinfo) {
  * handler for SIGINT and SIGTERM
  *
  */
-void signal_handler(int signo){
+void signal_handler(int signo) {
     if (signo == SIGINT || signo == SIGTERM) {
         printf("Caught signal %d\n", signo);
+        syslog(LOG_INFO, "Caught signal %d\n", signo);
         if (sockfd != -1) {
             close(sockfd);
             printf("Socket closed successfully.\n");
@@ -68,16 +69,13 @@ void signal_handler(int signo){
     }
     fprintf(stderr, "Unexpected signal!\n");
     exit(EXIT_FAILURE);
-
 }
 
-void *get_in_addr(struct sockaddr *sa)
-{
-    return &((struct sockaddr_in*)sa)->sin_addr;
+void *get_in_addr(struct sockaddr *sa) {
+    return &((struct sockaddr_in *) sa)->sin_addr;
 }
 
-int write_to_file(char* file_name, char* file_content)
-{
+int write_to_file(char *file_name, char *file_content) {
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
         printf("Current working directory: %s\n", cwd);
@@ -86,8 +84,7 @@ int write_to_file(char* file_name, char* file_content)
     }
     const int fd = open(file_name, O_WRONLY | O_APPEND | O_CREAT,
                         S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-    if (fd == -1)
-    {
+    if (fd == -1) {
         syslog(LOG_ERR, "Error opening file: %s", file_name);
         printf("Error opening file: %s\n", file_name);
         return 1;
@@ -96,8 +93,7 @@ int write_to_file(char* file_name, char* file_content)
 
     const ssize_t bytes_written = write(fd, file_content, strlen(file_content));
 
-    if (bytes_written == -1)
-    {
+    if (bytes_written == -1) {
         syslog(LOG_ERR, "Failed to write to file: %s", file_name);
         close(fd);
         return 1;
@@ -105,15 +101,14 @@ int write_to_file(char* file_name, char* file_content)
 
     syslog(LOG_USER, "Successfully wrote to file: %s", file_name);
     printf("Successfully wrote to file: %s", file_name);
-    if (close(fd) == -1)
-    {
+    if (close(fd) == -1) {
         syslog(LOG_ERR, "Error closing file: %s", file_name);
         return 1;
     }
     return 0;
 }
 
-char* read_from_file(char* file_name) {
+char *read_from_file(char *file_name) {
     int fd = open(file_name, O_RDONLY);
     if (fd == -1) {
         perror("Error opening file");
@@ -128,7 +123,7 @@ char* read_from_file(char* file_name) {
     }
 
     size_t file_size = st.st_size;
-    char *buf = (char *)malloc(file_size + 1);
+    char *buf = (char *) malloc(file_size + 1);
     if (buf == NULL) {
         perror("Memory allocation failed");
         close(fd);
@@ -149,8 +144,7 @@ char* read_from_file(char* file_name) {
 }
 
 
-
-int main() {
+int main(int argc, char *argv[]) {
     int status;
     struct addrinfo hints;
     struct addrinfo *servinfo, *p;
@@ -160,11 +154,17 @@ int main() {
     char s[INET6_ADDRSTRLEN];
     char buffer[BUFFER_SIZE];
 
+    int daemon_mode = 0;
+    if (argc == 2 && strcmp(argv[1], "-d") == 0) {
+        daemon_mode = 1;
+        printf("Going in daemon started.\n");
+    }
+
 
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET;         // IPv4
-    hints.ai_socktype = SOCK_STREAM;  // TCP
-    hints.ai_flags = AI_PASSIVE;      // Fill in my IP for me
+    hints.ai_family = AF_INET; // IPv4
+    hints.ai_socktype = SOCK_STREAM; // TCP
+    hints.ai_flags = AI_PASSIVE; // Fill in my IP for me
 
     if ((status = getaddrinfo(NULL, "9000", &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
@@ -224,26 +224,28 @@ int main() {
     printf("server: waiting for connections...\n");
     syslog(LOG_INFO, "server: waiting for connections...\n");
 
-    while(1) {
+    while (1) {
         sin_size = sizeof their_addr;
-        new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+        new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size);
         if (new_fd == -1) {
             perror("accept");
             continue;
         }
 
         inet_ntop(their_addr.ss_family,
-            get_in_addr((struct sockaddr *)&their_addr),
-            s, sizeof s);
+                  get_in_addr((struct sockaddr *) &their_addr),
+                  s, sizeof s);
         printf("server: Accepted connection from %s\n", s);
         syslog(LOG_INFO, "server: Accepted connection from %s\n", s);
 
         //makes the process daemonic
-        // if (daemon(0, 0) == -1) {
-        //     perror("daemon");
-        //     close(new_fd);
-        //     continue;
-        // }
+        if (daemon_mode == 1) {
+         if (daemon(0, 0) == -1) {
+             perror("daemon");
+             close(new_fd);
+             continue;
+         }
+            }
 
         ssize_t bytes_received = recv(new_fd, buffer, BUFFER_SIZE - 1, 0);
         if (bytes_received > 0) {
@@ -251,7 +253,8 @@ int main() {
             printf("server: Received data: %s\n", buffer);
 
             pid_t pid = fork();
-            if (pid == 0) { // Child process
+            if (pid == 0) {
+                // Child process
                 close(sockfd); // Close the listening socket in the child process
                 printf("server: writing data: %s\n", buffer);
                 write_to_file(FILEPATH, buffer);
