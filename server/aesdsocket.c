@@ -36,11 +36,11 @@ void signal_handler(int signo) {
     exit(EXIT_SUCCESS);
 }
 
-void handle_client(int client_fd) {
+void handle_client(int fd) {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
 
-    while ((bytes_received = recv(client_fd, buffer, BUFFER_SIZE - 1, 0)) > 0) {
+    while ((bytes_received = recv(fd, buffer, BUFFER_SIZE - 1, 0)) > 0) {
         buffer[bytes_received] = '\0';
         fprintf(data_file, "%s", buffer);
         fflush(data_file);
