@@ -36,21 +36,49 @@ void signal_handler(int signo) {
     exit(EXIT_SUCCESS);
 }
 
-void handle_client(int fd) {
+void handle_client(int sock_fd) {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
+    ssize_t bytes_read;
+    FILE* fp = NULL;
 
-    while ((bytes_received = recv(fd, buffer, BUFFER_SIZE - 1, 0)) > 0) {
+    fp = fopen(FILEPATH, "a+");
+    if (!fp) {
+        syslog(LOG_ERR, "Failed to open file");
+        return;
+    }
+
+    while (1) {
+        bytes_received = recv(sock_fd, buffer, BUFFER_SIZE - 1, 0);
+        if (bytes_received <= 0) {
+            syslog(LOG_ERR, "recv error or connection closed");
+            break;
+        }
+
         buffer[bytes_received] = '\0';
-        fprintf(data_file, "%s", buffer);
-        fflush(data_file);
 
-        fseek(data_file, 0, SEEK_SET);
-        char file_buffer[BUFFER_SIZE];
-        while (fgets(file_buffer, BUFFER_SIZE, data_file)) {
-            send(client_fd, file_buffer, strlen(file_buffer), 0);
+        if (fwrite(buffer, sizeof(char), (size_t)bytes_received, fp) != (size_t)bytes_received) {
+            syslog(LOG_ERR, "Failed to write to file");
+            break;
+        }
+
+        if (buffer[bytes_received - 1] == '\n') {
+            fflush(fp);
+            fseek(fp, 0, SEEK_SET);
+
+            while ((bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, fp)) > 0) {
+                if (send(sock_fd, buffer, bytes_read, 0) == -1) {
+                    syslog(LOG_ERR, "send error");
+                    break;
+                }
+            }
+
+            memset(buffer, 0, sizeof(buffer));
+            fseek(fp, 0, SEEK_END);
         }
     }
+
+    fclose(fp);
 }
 
 int main(int argc, char *argv[]) {
@@ -60,7 +88,10 @@ int main(int argc, char *argv[]) {
     char client_ip[INET_ADDRSTRLEN];
     int yes = 1;
 
-    int daemon_mode = (argc == 2 && strcmp(argv[1], "-d") == 0);
+    int daemon_mode = 0;
+    if (argc == 2 && strcmp(argv[1], "-d") == 0) {
+        daemon_mode = 1;
+    }
 
     openlog("aesdsocket", LOG_PID, LOG_USER);
 
@@ -125,7 +156,6 @@ int main(int argc, char *argv[]) {
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
 
         handle_client(client_fd);
-
         syslog(LOG_INFO, "Closed connection from %s", client_ip);
         close(client_fd);
         client_fd = -1;
