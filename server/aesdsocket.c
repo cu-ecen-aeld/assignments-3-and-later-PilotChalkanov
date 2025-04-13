@@ -31,6 +31,7 @@ void cleanup() {
 }
 
 void signal_handler(int signo) {
+    (void)signo;
     cleanup();
     exit(EXIT_SUCCESS);
 }
