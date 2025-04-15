@@ -3,11 +3,11 @@
 case "$1" in
   start)
     echo "Starting server"
-    start-stop-daemon -S -n aesdsocket /usr/bin/aesdsocket -d
+    /usr/bin/aesdsocket -d
     ;;
   stop)
     echo "Stopping server"
-    start-stop-daemon -K -n aesdsocket -s SIGTERM
+    pkill aesdsocket
     ;;
   *)
     echo "Usage: $0 {start|stop}"
