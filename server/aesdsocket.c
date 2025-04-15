@@ -40,11 +40,11 @@ void handle_client(int sock_fd) {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
     ssize_t bytes_read;
-    FILE* fp = NULL;
+    int fd = -1;
 
-    fp = fopen(FILEPATH, "a+");
-    if (!fp) {
-        syslog(LOG_ERR, "Failed to open file");
+    fd = open(FILEPATH, O_CREAT | O_RDWR | O_APPEND, 0644);
+    if (fd == -1) {
+        syslog(LOG_ERR, "Failed to open file: %s", strerror(errno));
         return;
     }
 
@@ -57,28 +57,31 @@ void handle_client(int sock_fd) {
 
         buffer[bytes_received] = '\0';
 
-        if (fwrite(buffer, sizeof(char), (size_t)bytes_received, fp) != (size_t)bytes_received) {
-            syslog(LOG_ERR, "Failed to write to file");
+        if (write(fd, buffer, bytes_received) != bytes_received) {
+            syslog(LOG_ERR, "Failed to write to file: %s", strerror(errno));
             break;
         }
 
         if (buffer[bytes_received - 1] == '\n') {
-            fflush(fp);
-            fseek(fp, 0, SEEK_SET);
+            lseek(fd, 0, SEEK_SET);
 
-            while ((bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, fp)) > 0) {
+            while ((bytes_read = read(fd, buffer, BUFFER_SIZE)) > 0) {
                 if (send(sock_fd, buffer, bytes_read, 0) == -1) {
-                    syslog(LOG_ERR, "send error");
+                    syslog(LOG_ERR, "send error: %s", strerror(errno));
                     break;
                 }
             }
 
+            if (bytes_read == -1) {
+                syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
+            }
+
             memset(buffer, 0, sizeof(buffer));
-            fseek(fp, 0, SEEK_END);
+            lseek(fd, 0, SEEK_END);
         }
     }
 
-    fclose(fp);
+    close(fd);
 }
 
 int main(int argc, char *argv[]) {
