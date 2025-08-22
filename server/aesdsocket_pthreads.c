@@ -20,7 +20,6 @@
 #define FILEPATH "/var/tmp/aesdsocketdata"
 #define BUFFER_SIZE 1024
 
-
 int sock_fd = -1;
 int file_fd = -1;
 FILE *data_file = NULL;
@@ -29,19 +28,23 @@ SLIST_HEAD(thread_list, thread_node);
 static struct thread_list g_threads;
 static pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void alarm_handler(int signo) {
+void alarm_handler(int signo, siginfo_t *info, void *context) {
     (void)signo;
+    (void)info;
+    (void)context;
     time_t rawtime;
     struct tm *timeinfo;
     char buffer[80];
+
     time(&rawtime);
     timeinfo = localtime(&rawtime);
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S\n", timeinfo);
-    printf("Debug: %s\n", buffer);
+    strftime(buffer, sizeof(buffer), "timestamp: %H:%M:%S\n", timeinfo);
+
     pthread_mutex_lock(&g_mutex);
     write(file_fd, buffer, strlen(buffer));
     pthread_mutex_unlock(&g_mutex);
 }
+
 void start_timestamp_timer() {
     struct itimerval delay;
     struct sigaction sa = {0};
@@ -70,8 +73,9 @@ void cleanup() {
         free(head);
     }
     pthread_mutex_destroy(&g_mutex);
-
-};
+    if (sock_fd != -1) close(sock_fd);
+    if (file_fd != -1) close(file_fd);
+}
 
 void signal_handler(int signo) {
     (void) signo;
@@ -82,7 +86,7 @@ void signal_handler(int signo) {
 static int init_server_addrinfo(const char *port, struct addrinfo **serv_info) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC; //ip_v4 or v6
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
@@ -103,17 +107,14 @@ int open_file_for_write() {
     return fd;
 }
 
-// thread func - accepts void arg - thread_node struct
-void  * handle_client(void *arg) {
+void * handle_client(void *arg) {
     thread_node *node = (thread_node *)arg;
     char wbuffer[BUFFER_SIZE];
     char rbuffer[BUFFER_SIZE];
     ssize_t bytes_read;
     int file_fd = node->file_fd;
     int client_id = node->client_fd;
-    char *client_ip = node->client_ip;
-    printf("Debug: Executing from thread %lu\n", pthread_self());
-    printf("Debug: Client IP: %s\n", client_ip);
+
     while (1) {
         ssize_t bytes_received = recv(client_id, wbuffer, BUFFER_SIZE - 1, 0);
         if (bytes_received <= 0) {
@@ -123,41 +124,44 @@ void  * handle_client(void *arg) {
         wbuffer[bytes_received] = '\0';
 
         pthread_mutex_lock(&g_mutex);
-        if (write(file_fd,wbuffer, (size_t)bytes_received) != (size_t)bytes_received) {
+        ssize_t bytes_written = write(file_fd, wbuffer, (size_t)bytes_received);
+        if (bytes_written != bytes_received) {
             syslog(LOG_ERR, "Failed to write to file");
             pthread_mutex_unlock(&g_mutex);
             break;
         }
-        pthread_mutex_unlock(&g_mutex);
+
         if (wbuffer[bytes_received - 1] == '\n') {
             lseek(file_fd, 0, SEEK_SET);
 
-            bytes_read = read(file_fd, rbuffer, BUFFER_SIZE);
-            if (bytes_read == -1) {
-                char* err = strerror(errno);
-                syslog(LOG_ERR, "Failed to read from file: %s", err);
-                printf("Debug: %s", err);
-                pthread_exit(NULL);
-            }
             while ((bytes_read = read(file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
                     syslog(LOG_ERR, "send error");
+                    printf("send error");
                     pthread_exit(NULL);
                 }
             }
+
+            if (bytes_read == -1) {
+                syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
+            }
+
+            // reset f position for next write
             lseek(file_fd, 0, SEEK_END);
         }
-        close(node->client_fd);
-        memset(wbuffer, 0, sizeof(wbuffer));
-        memset(rbuffer, 0, sizeof(rbuffer));
-        node->is_completed = true;
-        pthread_exit(NULL);
+        pthread_mutex_unlock(&g_mutex);
+
+        if (wbuffer[bytes_received - 1] == '\n') {
+            break;
+        }
     }
+
+    close(node->client_fd);
+    node->is_completed = true;
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
-    // addr-info init
     int optval = 1;
     int daemon_mode = 0;
 
@@ -168,18 +172,16 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // socket init - iterate over the addr_info LL and try to bind
     for (p = serv_info; p != NULL; p = p->ai_next) {
         sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (sock_fd == -1) continue;
 
-        // socket options - SOL_SOCKET - protocol lvl for which opts apply
         if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1) {
             close(sock_fd);
             return -1;
         }
         if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == 0) break;
-        // if bind fails - closing the sock
+
         close(sock_fd);
         syslog(LOG_ERR, "Failed to bind socket");
     }
@@ -187,10 +189,9 @@ int main(int argc, char *argv[]) {
         syslog(LOG_ERR, "Failed to bind socket");
         return -1;
     }
-    // done with serv_info
+
     freeaddrinfo(serv_info);
 
-    /*** singal handling ***/
     struct sigaction sa = {0};
     sa.sa_handler = signal_handler;
     sigemptyset(&sa.sa_mask);
@@ -201,7 +202,7 @@ int main(int argc, char *argv[]) {
     }
 
     openlog("aesdsocket", LOG_PID, LOG_USER);
-    // daemonize if needed
+
     if (argc == 2 && strcmp(argv[1], "-d") == 0) {
         daemon_mode = 1;
     }
@@ -216,12 +217,11 @@ int main(int argc, char *argv[]) {
         syslog(LOG_ERR, "Failed to listen on socket");
         return -1;
     }
-    printf("Listening on locahost: %s\n", PORT);
-    // open file and start timer
+
     file_fd = open_file_for_write();
     start_timestamp_timer();
 
-    thread_node *n;
+    thread_node *n, *tmp;
     while (1) {
         struct sockaddr_storage client_addr;
         socklen_t addr_size = sizeof(client_addr);
@@ -232,28 +232,37 @@ int main(int argc, char *argv[]) {
         thread_node *node = malloc(sizeof(struct thread_node));
         if (!node) {
             syslog(LOG_ERR, "Failed to allocate memory");
+            close(client_fd);
             continue;
         }
-        int len = sizeof(node->client_ip);
+
         struct sockaddr_in *ipv4_addr = (struct sockaddr_in *)&client_addr;
-        struct in_addr *ip_address_ptr = &ipv4_addr->sin_addr;
-        inet_ntop(client_addr.ss_family, ip_address_ptr, node->client_ip, len);
+        inet_ntop(AF_INET, &ipv4_addr->sin_addr, node->client_ip, sizeof(node->client_ip));
 
         syslog(LOG_INFO, "Accepted connection from %s", node->client_ip);
 
         node->client_fd = client_fd;
         node->file_fd = file_fd;
-        node->mutex=g_mutex;
+        node->is_completed = false;
+
         if (pthread_create(&node->thread_id, NULL, &handle_client, node) != 0) {
             syslog(LOG_ERR, "Failed to create thread");
-            return -1;
-        };
+            close(client_fd);
+            free(node);
+            continue;
+        }
+
         SLIST_INSERT_HEAD(&g_threads, node, next);
-        SLIST_FOREACH(n, &g_threads, next) {
-            if (!n->is_completed) {
-                break;
+
+        SLIST_FOREACH_SAFE(n, &g_threads, next, tmp) {
+            if (n->is_completed) {
+                pthread_join(n->thread_id, NULL);
+                SLIST_REMOVE(&g_threads, n, thread_node, next);
+                free(n);
             }
-            pthread_join(n->thread_id, NULL);
         }
     }
+
+    cleanup();
+    return 0;
 }
