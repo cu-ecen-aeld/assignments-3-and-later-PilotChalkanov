@@ -108,6 +108,7 @@ int open_file_for_write() {
 }
 
 void * handle_client(void *arg) {
+    // cast here to avoid warnings when compiling
     thread_node *node = (thread_node *)arg;
     char wbuffer[BUFFER_SIZE];
     char rbuffer[BUFFER_SIZE];
@@ -142,11 +143,11 @@ void * handle_client(void *arg) {
                 }
             }
 
-            if (bytes_read == -1) {
+            if (bytes_read < 0) {
+                printf(strerror(errno));
                 syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
             }
-
-            // reset f position for next write
+            // reset f position for next write(the whole file content should be returned each time)
             lseek(file_fd, 0, SEEK_END);
         }
         pthread_mutex_unlock(&g_mutex);
@@ -155,7 +156,6 @@ void * handle_client(void *arg) {
             break;
         }
     }
-
     close(node->client_fd);
     node->is_completed = true;
     pthread_exit(NULL);
@@ -167,6 +167,7 @@ int main(int argc, char *argv[]) {
 
     SLIST_INIT(&g_threads);
 
+    // prepare the addrinfo structure
     struct addrinfo *serv_info, *p;
     if (init_server_addrinfo(PORT, &serv_info) != 0) {
         return -1;
@@ -192,6 +193,7 @@ int main(int argc, char *argv[]) {
 
     freeaddrinfo(serv_info);
 
+    // set singla handlers
     struct sigaction sa = {0};
     sa.sa_handler = signal_handler;
     sigemptyset(&sa.sa_mask);
@@ -221,6 +223,7 @@ int main(int argc, char *argv[]) {
     file_fd = open_file_for_write();
     start_timestamp_timer();
 
+    // main loop for accepting client conn
     thread_node *n, *tmp;
     while (1) {
         struct sockaddr_storage client_addr;
