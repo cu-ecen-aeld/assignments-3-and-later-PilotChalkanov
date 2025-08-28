@@ -75,6 +75,10 @@ void cleanup() {
     pthread_mutex_destroy(&g_mutex);
     if (sock_fd != -1) close(sock_fd);
     if (file_fd != -1) close(file_fd);
+    if (data_file) fclose(data_file);
+    remove(FILEPATH);
+    syslog(LOG_INFO, "Caught signal, exiting");
+    closelog();
 }
 
 void signal_handler(int signo) {
