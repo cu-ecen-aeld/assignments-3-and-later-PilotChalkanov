@@ -144,7 +144,7 @@ void * handle_client(void *arg) {
             }
 
             if (bytes_read < 0) {
-                printf(strerror(errno));
+                printf("Failed to read from file: %s", strerror(errno));
                 syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
             }
             // reset f position for next write(the whole file content should be returned each time)
