@@ -1,6 +1,6 @@
 #cross-compilation prefix
 CROSS_COMPILE ?=
-CC = $(CROSS_COMPILE)gcc
+CC ?= $(CROSS_COMPILE)gcc
 CFLAGS = -g -Wall -Werror -Wextra
 TARGET = aesdsocket
 LDFLAGS = -pthread
