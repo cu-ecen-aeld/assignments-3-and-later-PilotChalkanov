@@ -124,7 +124,7 @@ void * handle_client(void *arg) {
         ssize_t bytes_received = recv(client_id, wbuffer, BUFFER_SIZE - 1, 0);
         if (bytes_received <= 0) {
             syslog(LOG_ERR, "recv error or connection closed");
-            pthread_exit(NULL);
+            return NULL;
         }
         wbuffer[bytes_received] = '\0';
 
@@ -143,7 +143,7 @@ void * handle_client(void *arg) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
                     syslog(LOG_ERR, "send error");
                     printf("send error");
-                    pthread_exit(NULL);
+                    return NULL;
                 }
             }
 
@@ -162,7 +162,7 @@ void * handle_client(void *arg) {
     }
     close(node->client_fd);
     node->is_completed = true;
-    pthread_exit(NULL);
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
