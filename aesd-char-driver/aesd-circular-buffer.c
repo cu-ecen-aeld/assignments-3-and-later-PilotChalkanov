@@ -16,6 +16,8 @@
 
 #include "aesd-circular-buffer.h"
 
+#include <stdlib.h>
+
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
  * @param char_offset the position to search for in the buffer list, describing the zero referenced
@@ -44,9 +46,20 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 */
 void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
-    /**
-    * TODO: implement per description
-    */
+    if (buffer->full) {
+        free(buffer->entry[0]);
+        buffer->entry[0] = *add_entry;
+        buffer->in_offs = 0;
+        buffer->out_offs = 1;
+    }
+    else {
+        buffer->entry[buffer->in_offs] = *add_entry;
+        buffer->in_offs++;
+        if (buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+            buffer->in_offs = 0;
+            buffer->full = true;
+        }
+    }
 }
 
 /**
@@ -56,3 +69,16 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 {
     memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
+
+/**
+ * some helper functions
+ */
+
+bool is_buffer_empty(struct aesd_circular_buffer *buffer) {
+    return (buffer->in_offs == buffer->out_offs && !buffer->full);
+}
+
+bool is_entry_empty(struct aesd_buffer_entry *entry) {
+    return (entry->buffptr == NULL || entry->size == 0);
+}
+
