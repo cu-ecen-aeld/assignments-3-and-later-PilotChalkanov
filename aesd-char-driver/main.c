@@ -18,6 +18,8 @@
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
+#include "aesd-circular-buffer.h"
+
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
@@ -30,9 +32,7 @@ int aesd_open(struct inode *inode, struct file *filp)
 {
     PDEBUG("open");
     printk(KERN_INFO "aesd_open\n");
-    /**
-     * TODO: handle open
-     */
+
     struct aesd_dev *dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
     if (!dev) {
         PDEBUG("Failed to get device structure");
@@ -52,9 +52,7 @@ int aesd_open(struct inode *inode, struct file *filp)
 int aesd_release(struct inode *inode, struct file *filp)
 {
     PDEBUG("release");
-    /**
-     * TODO: handle release
-     */
+
     return 0;
 }
 
@@ -63,9 +61,33 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 {
     ssize_t retval = 0;
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
-    /**
-     * TODO: handle read
-     */
+    struct aesd_dev *dev = filp->private_data;
+
+    if(down_interruptible(&dev->sem))
+    return -ERESTARTSYS;
+
+    struct aesd_buffer_entry *entry;
+    size_t entry_offset;
+    entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->aesd_circular_buffer,
+                                                           *f_pos, &entry_offset);
+    if(!entry){
+        PDEBUG("No data available");
+        up(&dev->sem);
+        return 0;
+        }
+     size_t bytes_available = entry->size - entry_offset;
+     PDEBUG("bytes_available %zu",bytes_available);
+     size_t bytes_to_read = (count < bytes_available) ? count : bytes_available;
+
+     if (copy_to_user(buf, entry->buffptr + entry_offset, bytes_to_read)) {
+         retval = -EFAULT;
+     } else {
+         *f_pos += bytes_to_read;
+         retval = bytes_to_read;
+         PDEBUG("read %zu bytes with offset %lld",bytes_to_read,*f_pos);
+     }
+
+    up(&dev->sem);
     return retval;
 }
 
@@ -102,7 +124,6 @@ static int aesd_setup_cdev(struct aesd_dev *dev)
 }
 
 
-
 int aesd_init_module(void)
 {
     dev_t dev = 0;
@@ -119,6 +140,8 @@ int aesd_init_module(void)
     /**
      * TODO: initialize the AESD specific portion of the device
      */
+    mutex_init(&aesd_device.lock);
+    aesd_circular_buffer_init(&aesd_device.buffer);
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -138,11 +161,17 @@ void aesd_cleanup_module(void)
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
+    uint8_t index;
+    struct aesd_buffer_entry *entry;
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, &aesd_device.buffer, index) {
+        if (entry->buffptr) {
+            kfree(entry->buffptr);
+        }
+    }
+    mutex_destroy(&aesd_device.lock);
 
     unregister_chrdev_region(devno, 1);
 }
-
-
 
 module_init(aesd_init_module);
 module_exit(aesd_cleanup_module);
