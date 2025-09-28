@@ -21,7 +21,7 @@
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
-MODULE_AUTHOR("Your Name Here"); /** TODO: fill in your name **/
+MODULE_AUTHOR("Nikolay Chalkanov");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
@@ -29,10 +29,24 @@ struct aesd_dev aesd_device;
 int aesd_open(struct inode *inode, struct file *filp)
 {
     PDEBUG("open");
+    printk(KERN_INFO "aesd_open\n");
     /**
      * TODO: handle open
      */
+    struct aesd_dev *dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+    if (!dev) {
+        PDEBUG("Failed to get device structure");
+        printk(KERN_ERR "Failed to get device structure\n");
+        return -ENODEV;
+    }
+
+    filp->private_data = dev;
+    filp->f_pos = 0;
+
+    PDEBUG("Device opened successfully");
+    printk(KERN_INFO "Device opened successfully\n");
     return 0;
+     /* success */
 }
 
 int aesd_release(struct inode *inode, struct file *filp)
