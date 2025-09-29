@@ -69,10 +69,9 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     if(mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
 
-    struct aesd_buffer_entry *entry;
     size_t entry_offset;
-    entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->buffer,
-                                                           *f_pos, &entry_offset);
+    struct aesd_buffer_entry *entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->buffer,
+        *f_pos, &entry_offset);
     if(!entry){
         PDEBUG("No data available");
         goto out;
@@ -84,12 +83,10 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
      if (copy_to_user(buf, entry->buffptr + entry_offset, bytes_to_read)) {
          retval = -EFAULT;
          goto out;
-     } else {
-         *f_pos += bytes_to_read;
-         retval = bytes_to_read;
-         PDEBUG("read %zu bytes with offset %lld",bytes_to_read,*f_pos);
-           goto out;
      }
+     *f_pos += bytes_to_read;
+     retval = bytes_to_read;
+     PDEBUG("read %zu bytes with offset %lld",bytes_to_read,*f_pos);
 
     out:
         mutex_unlock(&dev->lock);
@@ -137,7 +134,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
 
     retval = count;
-
+    goto out;
 
     out_free:
         kfree(partial_entry);
