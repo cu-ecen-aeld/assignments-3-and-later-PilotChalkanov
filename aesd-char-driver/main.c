@@ -94,31 +94,53 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 }
 
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
-                loff_t *f_pos)
+                   loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
-    PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
+    PDEBUG("write %zu bytes with offset %lld", count, *f_pos);
     /**
      * TODO: handle write
      */
     struct aesd_dev *dev = filp->private_data;
-    struct aesd_buf = dev->buffer;
-    struct aesd_buffer_entry *new_entry, *old_entry;
+    struct aesd_circular_buffer *aesd_buf = &dev->buffer;
+    struct aesd_buffer_entry new_entry;
+    const char *old_entry;
     char *partial_entry;
-    // kernel alloc aesd buffer entry
-    new_entry = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
-    if (!entry) {
-    return -ENOMEM;
-       }
-    //TODO: copy data from user buffer to kernel buffer
-    copy_from_user(partial_entry, buf, count);
-    old_entry = aesd_circular_buffer_add_entry(aesd_buf, partial_entry);
-    if (old_entry) {
-        kfree(old_entry->buffptr);
+
+    if (mutex_lock_interruptible(&dev->lock))
+        return -ERESTARTSYS;
+
+    // kamalloc kernel buffer for the data
+    partial_entry = kmalloc(count, GFP_KERNEL);
+    if (!partial_entry) {
+        retval = -ENOMEM;
+        goto out;
     }
 
-    return retval;
+    // TODO: copy data from user buffer to kernel buffer
+    if (copy_from_user(partial_entry, buf, count)) {
+        retval = -EFAULT;
+        goto out_free;
+    }
+
+    new_entry.buffptr = partial_entry;
+    new_entry.size = count;
+    old_entry = aesd_circular_buffer_add_entry(aesd_buf, &new_entry);
+    if (old_entry) {
+        kfree(old_entry);
+    }
+
+    retval = count;
+    goto out;
+
+    out_free:
+        kfree(partial_entry);
+    out:
+        mutex_unlock(&dev->lock);
+        return retval;
 }
+
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
