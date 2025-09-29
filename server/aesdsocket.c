@@ -137,12 +137,13 @@ void * handle_client(void *arg) {
         }
 
         if (wbuffer[bytes_received - 1] == '\n') {
-            lseek(file_fd, 0, SEEK_SET);
+           // lseek(file_fd, 0, SEEK_SET);
 
             while ((bytes_read = read(file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
                     syslog(LOG_ERR, "send error");
                     printf("send error");
+                    pthread_mutex_unlock(&g_mutex);
                     return NULL;
                 }
             }
