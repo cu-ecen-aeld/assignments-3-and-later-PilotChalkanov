@@ -64,7 +64,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     struct aesd_dev *dev = filp->private_data;
 
     if(down_interruptible(&dev->sem))
-    return -ERESTARTSYS;
+        return -ERESTARTSYS;
 
     struct aesd_buffer_entry *entry;
     size_t entry_offset;
@@ -73,7 +73,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     if(!entry){
         PDEBUG("No data available");
         up(&dev->sem);
-        return 0;
+        goto out;
         }
      size_t bytes_available = entry->size - entry_offset;
      PDEBUG("bytes_available %zu",bytes_available);
@@ -81,14 +81,17 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
      if (copy_to_user(buf, entry->buffptr + entry_offset, bytes_to_read)) {
          retval = -EFAULT;
+         goto out;
      } else {
          *f_pos += bytes_to_read;
          retval = bytes_to_read;
          PDEBUG("read %zu bytes with offset %lld",bytes_to_read,*f_pos);
+           goto out;
      }
 
-    up(&dev->sem);
-    return retval;
+    out:
+        up(&dev->sem);
+        return retval;
 }
 
 ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
