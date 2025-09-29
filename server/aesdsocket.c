@@ -17,7 +17,7 @@
 
 #define PORT "9000"
 #define BACKLOG 10
-#define FILEPATH "/var/tmp/aesdsocketdata"
+#define FILEPATH "/dev/aesdchar"
 #define BUFFER_SIZE 1024
 
 int sock_fd = -1;
