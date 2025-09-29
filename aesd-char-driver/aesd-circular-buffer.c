@@ -16,8 +16,6 @@
 
 #include "aesd-circular-buffer.h"
 
-#include <stdlib.h>
-
 /**
  * some helper functions
  */
