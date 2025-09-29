@@ -17,8 +17,8 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
-#include "aesdchar.h"
 #include "aesd-circular-buffer.h"
+#include "aesdchar.h"
 
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
@@ -71,7 +71,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
     struct aesd_buffer_entry *entry;
     size_t entry_offset;
-    entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->aesd_circular_buffer,
+    entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->buffer,
                                                            *f_pos, &entry_offset);
     if(!entry){
         PDEBUG("No data available");
@@ -214,7 +214,6 @@ void aesd_cleanup_module(void)
             kfree(entry->buffptr);
         }
     }
-    mutex_destroy(&aesd_device.lock);
 
     unregister_chrdev_region(devno, 1);
 }
