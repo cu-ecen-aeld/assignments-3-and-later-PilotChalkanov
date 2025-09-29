@@ -101,6 +101,22 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     /**
      * TODO: handle write
      */
+    struct aesd_dev *dev = filp->private_data;
+    struct aesd_buf = dev->buffer;
+    struct aesd_buffer_entry *new_entry, *old_entry;
+    char *partial_entry;
+    // kernel alloc aesd buffer entry
+    new_entry = kmalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
+    if (!entry) {
+    return -ENOMEM;
+       }
+    //TODO: copy data from user buffer to kernel buffer
+    copy_from_user(partial_entry, buf, count);
+    old_entry = aesd_circular_buffer_add_entry(aesd_buf, partial_entry);
+    if (old_entry) {
+        kfree(old_entry->buffptr);
+    }
+
     return retval;
 }
 struct file_operations aesd_fops = {
