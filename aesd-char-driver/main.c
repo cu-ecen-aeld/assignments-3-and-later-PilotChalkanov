@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/printk.h>
+#include <linux/mutex.h>
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
@@ -108,40 +109,59 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         return 0;
     }
 
-    struct aesd_circular_buffer *aesd_buf = &dev->buffer;
-    struct aesd_buffer_entry new_entry;
-    char *old_entry;
-    char *partial_entry;
-
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
 
-    partial_entry = kmalloc(count, GFP_KERNEL);
-    if (!partial_entry) {
+    char *new_data = kmalloc(count, GFP_KERNEL);
+    if (!new_data) {
         retval = -ENOMEM;
         goto out;
     }
 
-    if (copy_from_user(partial_entry, buf, count)) {
+    if (copy_from_user(new_data, buf, count)) {
         retval = -EFAULT;
-        goto out_free;
+        goto out_free_new;
     }
 
-    new_entry.buffptr = partial_entry;
-    new_entry.size = count;
-    old_entry = aesd_circular_buffer_add_entry(aesd_buf, &new_entry);
-    if (old_entry) {
-        kfree(old_entry);
+    size_t total_size = dev->partial_write_size + count;
+    char *combined_buffer = kmalloc(total_size, GFP_KERNEL);
+    if (!combined_buffer) {
+        retval = -ENOMEM;
+        goto out_free_new;
     }
 
+    if (dev->partial_write_size > 0) {
+        memcpy(combined_buffer, dev->partial_write_buffer, dev->partial_write_size);
+        kfree(dev->partial_write_buffer); // Free old partial buffer
+    }
+
+    memcpy(combined_buffer + dev->partial_write_size, new_data, count);
+
+    if (combined_buffer[total_size - 1] == '\n') {
+        struct aesd_buffer_entry new_entry;
+        new_entry.buffptr = combined_buffer;
+        new_entry.size = total_size;
+
+        const char *old_entry = aesd_circular_buffer_add_entry(&dev->buffer, &new_entry);
+        if (old_entry) {
+            kfree(old_entry);
+        }
+
+        dev->partial_write_buffer = NULL;
+        dev->partial_write_size = 0;
+    } else {
+        dev->partial_write_buffer = combined_buffer;
+        dev->partial_write_size = total_size;
+    }
+
+    *f_pos += count;
     retval = count;
-    goto out;
 
-    out_free:
-        kfree(partial_entry);
-    out:
-        mutex_unlock(&dev->lock);
-        return retval;
+out_free_new:
+    kfree(new_data);
+out:
+    mutex_unlock(&dev->lock);
+    return retval;
 }
 
 
@@ -186,6 +206,8 @@ int aesd_init_module(void)
      */
     mutex_init(&aesd_device.lock);
     aesd_circular_buffer_init(&aesd_device.buffer);
+    aesd_device.partial_write_buffer = NULL;
+    aesd_device.partial_write_size = 0;
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -212,6 +234,11 @@ void aesd_cleanup_module(void)
             kfree(entry->buffptr);
         }
     }
+
+    if (aesd_device.partial_write_buffer) {
+        kfree(aesd_device.partial_write_buffer);
+    }
+    mutex_destroy(&aesd_device.lock);
 
     unregister_chrdev_region(devno, 1);
 }
