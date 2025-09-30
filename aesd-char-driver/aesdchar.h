@@ -31,7 +31,8 @@ struct aesd_dev
     struct cdev cdev;
     struct mutex lock;
     struct aesd_circular_buffer buffer;
-    struct aesd_buffer_entry entry;
+    char *partial_write_buffer;     /* Buffer for accumulating partial writes */
+    size_t partial_write_size;      /* Current size of partial write buffer */
 
 };
 
