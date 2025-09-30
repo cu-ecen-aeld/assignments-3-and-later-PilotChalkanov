@@ -33,7 +33,8 @@ int aesd_open(struct inode *inode, struct file *filp)
     PDEBUG("open");
     printk(KERN_INFO "aesd_open\n");
 
-    struct aesd_dev *dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+    struct aesd_dev *dev;
+    dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
     if (!dev) {
         PDEBUG("Failed to get device structure");
         printk(KERN_ERR "Failed to get device structure\n");
@@ -98,13 +99,15 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 {
     ssize_t retval = -ENOMEM;
     PDEBUG("write %zu bytes with offset %lld", count, *f_pos);
-    /**
-     * TODO: handle write
-     */
     struct aesd_dev *dev = filp->private_data;
     if (!dev) {
         return -ENODEV;
     }
+
+    if (count == 0) {
+        return 0;
+    }
+
     struct aesd_circular_buffer *aesd_buf = &dev->buffer;
     struct aesd_buffer_entry new_entry;
     char *old_entry;
@@ -113,14 +116,12 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
 
-    // kamalloc kernel buffer for the data
     partial_entry = kmalloc(count, GFP_KERNEL);
     if (!partial_entry) {
         retval = -ENOMEM;
         goto out;
     }
 
-    // TODO: copy data from user buffer to kernel buffer
     if (copy_from_user(partial_entry, buf, count)) {
         retval = -EFAULT;
         goto out_free;
