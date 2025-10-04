@@ -6,6 +6,8 @@ TARGET ?= aesdsocket
 LDFLAGS ?= -pthread
 SRC = aesdsocket.c
 
+CFLAGS += -DUSE_AESD_CHAR_DEVICE=1
+
 default: all
 
 all: $(TARGET)
