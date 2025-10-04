@@ -15,9 +15,19 @@
 #include <sys/time.h>
 #include "thread_node.h"
 
+#ifndef USE_AESD_CHAR_DEVICE
+#define USE_AESD_CHAR_DEVICE 1
+#endif
+
 #define PORT "9000"
 #define BACKLOG 10
+
+#if USE_AESD_CHAR_DEVICE
 #define FILEPATH "/dev/aesdchar"
+#else
+#define FILEPATH "/var/tmp/aesdsocketdata"
+#endif
+
 #define BUFFER_SIZE 1024
 
 int sock_fd = -1;
@@ -28,6 +38,7 @@ SLIST_HEAD(thread_list, thread_node);
 static struct thread_list g_threads;
 static pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+#if !USE_AESD_CHAR_DEVICE
 void alarm_handler(int signo, siginfo_t *info, void *context) {
     (void)signo;
     (void)info;
@@ -38,10 +49,12 @@ void alarm_handler(int signo, siginfo_t *info, void *context) {
 
     time(&rawtime);
     timeinfo = localtime(&rawtime);
-    strftime(buffer, sizeof(buffer), "timestamp: %H:%M:%S\n", timeinfo);
+    strftime(buffer, sizeof(buffer), "timestamp:%a %b %e %H:%M:%S %Y\n", timeinfo);
 
     pthread_mutex_lock(&g_mutex);
-    write(file_fd, buffer, strlen(buffer));
+    if (file_fd != -1) {
+        write(file_fd, buffer, strlen(buffer));
+    }
     pthread_mutex_unlock(&g_mutex);
 }
 
@@ -63,6 +76,7 @@ void start_timestamp_timer() {
         return;
     }
 }
+#endif
 
 void cleanup() {
     thread_node *head;
@@ -76,7 +90,9 @@ void cleanup() {
     if (sock_fd != -1) close(sock_fd);
     if (file_fd != -1) close(file_fd);
     if (data_file) fclose(data_file);
+#if !USE_AESD_CHAR_DEVICE
     remove(FILEPATH);
+#endif
     syslog(LOG_INFO, "Caught signal, exiting");
     closelog();
 }
@@ -103,7 +119,11 @@ static int init_server_addrinfo(const char *port, struct addrinfo **serv_info) {
 }
 
 int open_file_for_write() {
+#if USE_AESD_CHAR_DEVICE
+    int fd = open(FILEPATH, O_RDWR);
+#else
     int fd = open(FILEPATH, O_RDWR | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+#endif
     if (fd == -1) {
         syslog(LOG_ERR, "Error opening file: %s", FILEPATH);
         return -1;
@@ -117,9 +137,8 @@ void * handle_client(void *arg) {
     char wbuffer[BUFFER_SIZE];
     char rbuffer[BUFFER_SIZE];
     ssize_t bytes_read;
-    int file_fd = node->file_fd;
-    int client_id = node->client_fd;
 
+    int client_id = node->client_fd;
     while (1) {
         ssize_t bytes_received = recv(client_id, wbuffer, BUFFER_SIZE - 1, 0);
         if (bytes_received <= 0) {
@@ -128,8 +147,12 @@ void * handle_client(void *arg) {
         }
         wbuffer[bytes_received] = '\0';
 
+#if USE_AESD_CHAR_DEVICE
+        int client_file_fd = open_file_for_write();
+#endif
+
         pthread_mutex_lock(&g_mutex);
-        ssize_t bytes_written = write(file_fd, wbuffer, (size_t)bytes_received);
+        ssize_t bytes_written = write(client_file_fd, wbuffer, (size_t)bytes_received);
         if (bytes_written != bytes_received) {
             syslog(LOG_ERR, "Failed to write to file");
             pthread_mutex_unlock(&g_mutex);
@@ -139,7 +162,7 @@ void * handle_client(void *arg) {
         if (wbuffer[bytes_received - 1] == '\n') {
            // lseek(file_fd, 0, SEEK_SET);
 
-            while ((bytes_read = read(file_fd, rbuffer, BUFFER_SIZE)) > 0) {
+            while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
                     syslog(LOG_ERR, "send error");
                     printf("send error");
@@ -152,8 +175,10 @@ void * handle_client(void *arg) {
                 printf("Failed to read from file: %s", strerror(errno));
                 syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
             }
+#if !USE_AESD_CHAR_DEVICE
             // reset f position for next write(the whole file content should be returned each time)
-            lseek(file_fd, 0, SEEK_END);
+            lseek(client_file_fd, 0, SEEK_END);
+#endif
         }
         pthread_mutex_unlock(&g_mutex);
 
@@ -225,8 +250,10 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+#if !USE_AESD_CHAR_DEVICE
     file_fd = open_file_for_write();
     start_timestamp_timer();
+#endif
 
     // main loop for accepting client conn
     thread_node *n, *tmp;
