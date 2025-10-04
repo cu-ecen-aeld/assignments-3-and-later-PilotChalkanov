@@ -120,12 +120,13 @@ static int init_server_addrinfo(const char *port, struct addrinfo **serv_info) {
 
 int open_file_for_write() {
 #if USE_AESD_CHAR_DEVICE
-    int fd = open(FILEPATH, O_RDWR);
+    int fd = open(FILEPATH, O_RDWR | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 #else
     int fd = open(FILEPATH, O_RDWR | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 #endif
     if (fd == -1) {
         syslog(LOG_ERR, "Error opening file: %s", FILEPATH);
+        syslog(LOG_ERR, "Err: %s", strerror(errno));
         return -1;
     }
     return fd;
@@ -214,7 +215,7 @@ int main(int argc, char *argv[]) {
         if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == 0) break;
 
         close(sock_fd);
-        syslog(LOG_ERR, "Failed to bind socket");
+        syslog(LOG_ERR, "Failed to bind socket: %s", strerror(errno));
     }
     if (p == NULL) {
         syslog(LOG_ERR, "Failed to bind socket");
