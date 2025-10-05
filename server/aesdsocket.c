@@ -170,6 +170,8 @@ void * handle_client(void *arg) {
                 pthread_mutex_unlock(&g_mutex);
                 break;
             }
+#else
+            lseek(client_file_fd, 0, SEEK_SET);
 #endif
 
             while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
