@@ -77,7 +77,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         *f_pos, &entry_offset);
     if(!entry){
         PDEBUG("No data available");
-        kprint("No data available");
+        printk("No data available");
         goto out;
         }
      size_t bytes_available = entry->size - entry_offset;
