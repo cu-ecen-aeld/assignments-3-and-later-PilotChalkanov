@@ -161,7 +161,16 @@ void * handle_client(void *arg) {
         }
 
         if (wbuffer[bytes_received - 1] == '\n') {
-           // lseek(file_fd, 0, SEEK_SET);
+            // Reopen file before every read
+#if USE_AESD_CHAR_DEVICE
+            close(client_file_fd);
+            client_file_fd = open_file_for_write();
+            if (client_file_fd == -1) {
+                syslog(LOG_ERR, "Failed to reopen file for reading");
+                pthread_mutex_unlock(&g_mutex);
+                break;
+            }
+#endif
 
             while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
