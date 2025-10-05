@@ -77,6 +77,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         *f_pos, &entry_offset);
     if(!entry){
         PDEBUG("No data available");
+        kprint("No data available");
         goto out;
         }
      size_t bytes_available = entry->size - entry_offset;
@@ -101,6 +102,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 {
     ssize_t retval = -ENOMEM;
     PDEBUG("write %zu bytes with offset %lld", count, *f_pos);
+    printk(KERN_INFO "write %zu bytes with offset %lld", count, *f_pos);
     struct aesd_dev *dev = filp->private_data;
     if (!dev) {
         return -ENODEV;
