@@ -58,8 +58,8 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
                          max_size;
 
     size_t current_offset = 0;
-
-    for (size_t i = 0; i < count; ++i) {
+    size_t i;
+    for (i = 0; i < count; ++i) {
         size_t index = (buffer->out_offs + i) % max_size;
         struct aesd_buffer_entry *entry = &buffer->entry[index];
 
