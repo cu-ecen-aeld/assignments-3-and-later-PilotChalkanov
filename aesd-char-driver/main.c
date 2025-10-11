@@ -19,7 +19,6 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
-#include <sys/types.h>
 
 #include "aesd-circular-buffer.h"
 #include "aesdchar.h"
