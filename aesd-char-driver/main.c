@@ -221,26 +221,26 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
                 break;
             }
             uint8_t num_entries = aesd_circular_buffer_get_full_count(buffer);
-            if (seekto.write_cmd >= num_entries) {
+            if (seekto->write_cmd >= num_entries) {
                 ret = -EINVAL;
                 break;
             }
 
-            uint8_t cmd_idx = (buffer->out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+            uint8_t cmd_idx = (buffer->out_offs + seekto->write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
             struct aesd_buffer_entry *entry = &buffer->entry[cmd_idx];
 
-            if (seekto.write_cmd_offset >= entry->size) {
+            if (seekto->write_cmd_offset >= entry->size) {
                 ret = -EINVAL;
                 break;
             }
 
             // Calculate the file position
             loff_t new_f_pos = 0;
-            for (uint8_t i = 0; i < seekto.write_cmd; i++) {
+            for (uint8_t i = 0; i < seekto->write_cmd; i++) {
                 uint8_t idx = (buffer->out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
                 new_f_pos += buffer->entry[idx].size;
             }
-            new_f_pos += seekto.write_cmd_offset;
+            new_f_pos += seekto->write_cmd_offset;
             filp->f_pos = new_f_pos;
             break;
         default:
