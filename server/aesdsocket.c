@@ -162,12 +162,18 @@ void * handle_client(void *arg) {
                 struct aesd_seekto seekto;
                 seekto.write_cmd = x;
                 seekto.write_cmd_offset = y;
-                int offset = ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, &seekto);
+
+                int ret = ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, &seekto);
+                if (ret < 0) {
+                    syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %s", strerror(errno));
+                    pthread_mutex_unlock(&g_mutex);
+                    return NULL;
+                }
+
                 pthread_mutex_lock(&g_mutex);
                 bytes_read = read(client_file_fd, rbuffer, offset);
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
-                    syslog(LOG_ERR, "send error");
-                    printf("send error");
+                    syslog(LOG_ERR, "ioctl send error");
                     pthread_mutex_unlock(&g_mutex);
                     return NULL;
                 }
