@@ -19,6 +19,8 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
+#include <sys/types.h>
+
 #include "aesd-circular-buffer.h"
 #include "aesdchar.h"
 
@@ -167,12 +169,37 @@ out:
     return retval;
 }
 
+loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
+    struct aesd_dev *dev = filp->private_data;
+    loff_t new_pos;
+    switch(whence) {
+        case 0: /* SEEK_SET */
+            new_pos = offset;
+            break;
+
+        case 1: /* SEEK_CUR */
+            new_pos = filp->f_pos + offset;
+            break;
+
+        case 2: /* SEEK_END */
+            new_pos = dev->size + offset;
+            break;
+
+        default: /* can't happen */
+            return -EINVAL;
+    }
+    if (new_pos < 0) return -EINVAL;
+    filp->f_pos = new_pos;
+    return new_pos;
+}
+
 
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
+    .llseek =   aesd_llseek,
     .release =  aesd_release,
 };
 
