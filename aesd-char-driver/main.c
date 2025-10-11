@@ -206,11 +206,13 @@ loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
 long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 
     struct aesd_dev *dev = filp->private_data;
-    struct aesd_seekto seekto;
+    struct aesd_seekto *seekto;
     long ret = 0;
 
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
+
+    kmalloc(sizeof(struct aesd_seekto), GFP_KERNEL);
 
     switch (cmd) {
         case AESDCHAR_IOCSEEKTO:
@@ -246,6 +248,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
             break;
     }
     mutex_unlock(&dev->lock);
+    kfree(seekto);
     return ret;
 }
 
