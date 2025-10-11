@@ -209,6 +209,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
     struct aesd_dev *dev = filp->private_data;
     struct aesd_seekto *seekto;
     long ret = 0;
+    int new_f_pos;
 
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
