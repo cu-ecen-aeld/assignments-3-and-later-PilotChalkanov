@@ -108,3 +108,13 @@ const char *aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, 
 void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer) {
     memset(buffer, 0, sizeof(struct aesd_circular_buffer));
 }
+
+uint8_t aesd_circular_buffer_get_full_count(struct aesd_circular_buffer *buffer) {
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+        if (buffer->entry[i].buffptr != NULL) {
+            count++;
+        }
+    }
+    return count;
+}
