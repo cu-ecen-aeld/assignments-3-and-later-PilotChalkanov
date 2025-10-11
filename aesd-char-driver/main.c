@@ -22,6 +22,7 @@
 
 #include "aesd-circular-buffer.h"
 #include "aesdchar.h"
+#include "aesd_ioctl.h"
 
 int aesd_major = 0; // use dynamic major
 int aesd_minor = 0;
