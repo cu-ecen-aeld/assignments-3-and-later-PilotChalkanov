@@ -228,7 +228,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
             }
 
             uint8_t cmd_idx = (dev->buffer.out_offs + seekto->write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-            struct aesd_buffer_entry *entry = dev->buffer.entry[cmd_idx];
+            struct aesd_buffer_entry *entry = &dev->buffer.entry[cmd_idx];
 
             if (seekto->write_cmd_offset >= entry->size) {
                 ret = -EINVAL;
