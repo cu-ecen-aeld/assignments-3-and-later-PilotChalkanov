@@ -227,8 +227,8 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
                 break;
             }
 
-            uint8_t cmd_idx = (dev->buffer->out_offs + seekto->write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-            struct aesd_buffer_entry *entry = dev->buffer->entry[cmd_idx];
+            uint8_t cmd_idx = (dev->buffer.out_offs + seekto->write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+            struct aesd_buffer_entry *entry = dev->buffer.entry[cmd_idx];
 
             if (seekto->write_cmd_offset >= entry->size) {
                 ret = -EINVAL;
@@ -238,8 +238,8 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
             // Calculate the file position
             loff_t new_f_pos = 0;
             for (uint8_t i = 0; i < seekto->write_cmd; i++) {
-                uint8_t idx = (dev->buffer->out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-                new_f_pos += dev->buffer->entry[idx].size;
+                uint8_t idx = (dev->buffer.out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+                new_f_pos += dev->buffer.entry[idx].size;
             }
             new_f_pos += seekto->write_cmd_offset;
             filp->f_pos = new_f_pos;
