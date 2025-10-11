@@ -214,7 +214,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
         return -ERESTARTSYS;
 
     seekto = kmalloc(sizeof(struct aesd_seekto), GFP_KERNEL);
-
+    struct aesd_circular_buffer *buffer = dev->buffer;
     switch (cmd) {
         case AESDCHAR_IOCSEEKTO:
             if (copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto))) {
