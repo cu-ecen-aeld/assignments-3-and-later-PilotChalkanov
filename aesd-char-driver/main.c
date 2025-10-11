@@ -212,7 +212,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
 
-    kmalloc(sizeof(struct aesd_seekto), GFP_KERNEL);
+    seekto = kmalloc(sizeof(struct aesd_seekto), GFP_KERNEL);
 
     switch (cmd) {
         case AESDCHAR_IOCSEEKTO:
