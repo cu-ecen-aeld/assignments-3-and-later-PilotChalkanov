@@ -163,24 +163,25 @@ void * handle_client(void *arg) {
                 seekto.write_cmd = x;
                 seekto.write_cmd_offset = y;
 
-                if(ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, seekto) < 0) {
+                if(ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
                     syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %s", strerror(errno));
+                    close(client_file_fd);
                     break;
                 }
 
                 pthread_mutex_lock(&g_mutex);
-                // Read and send all data after seek
-                bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE);
-                if (bytes_read> 0) {
+                while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                     if (send(client_id, rbuffer, bytes_read, 0) == -1) {
-                        syslog(LOG_ERR, "ioctl send error");
+                        syslog(LOG_ERR, "send error");
                         pthread_mutex_unlock(&g_mutex);
+                        close(client_file_fd);
                         break;
                     }
                 }
                 pthread_mutex_unlock(&g_mutex);
             }
-            continue; // skip write
+            close(client_file_fd);
+            continue;
         }
 
         pthread_mutex_lock(&g_mutex);
@@ -192,7 +193,6 @@ void * handle_client(void *arg) {
         }
 
         if (wbuffer[bytes_received - 1] == '\n') {
-            // Reopen file before every read
 #if USE_AESD_CHAR_DEVICE
             close(client_file_fd);
             client_file_fd = open_file_for_write();
@@ -218,7 +218,6 @@ void * handle_client(void *arg) {
                 syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
             }
 #if !USE_AESD_CHAR_DEVICE
-            // reset f position for next write(the whole file content should be returned each time)
             lseek(client_file_fd, 0, SEEK_END);
 #endif
         }
@@ -232,6 +231,7 @@ void * handle_client(void *arg) {
     node->is_completed = true;
     return NULL;
 }
+
 
 int main(int argc, char *argv[]) {
     int optval = 1;
