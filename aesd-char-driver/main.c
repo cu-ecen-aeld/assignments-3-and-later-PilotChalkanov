@@ -11,6 +11,7 @@
  *
  */
 
+#include <asm-generic/errno-base.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/printk.h>
@@ -207,42 +208,42 @@ loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
 long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 
     struct aesd_dev *dev = filp->private_data;
-    struct aesd_seekto *seekto;
+    struct aesd_seekto seekto;
     long ret = 0;
-    int new_f_pos;
+    loff_t new_f_pos;
 
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
 
-    seekto = kmalloc(sizeof(struct aesd_seekto), GFP_KERNEL);
-
     switch (cmd) {
         case AESDCHAR_IOCSEEKTO:
-            if (copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto))) {
+            PDEBUG("SEEK ioctl, arg=%lu", arg);
+            if (copy_from_user(seekto, (const void __user *)arg, sizeof(seekto))) {
+                PDEBUG("seekto: write_cmd=%u, write_cmd_offset=%u", seekto.write_cmd, seekto.write_cmd_offset);
                 ret = -EFAULT;
                 break;
             }
             uint8_t num_entries = aesd_circular_buffer_get_full_count(&dev->buffer);
-            if (seekto->write_cmd >= num_entries) {
+            if (seekto.write_cmd >= num_entries) {
                 ret = -EINVAL;
                 break;
             }
 
-            uint8_t cmd_idx = (dev->buffer.out_offs + seekto->write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+            uint8_t cmd_idx = (dev->buffer.out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
             struct aesd_buffer_entry *entry = &dev->buffer.entry[cmd_idx];
 
-            if (seekto->write_cmd_offset >= entry->size) {
+            if (seekto.write_cmd_offset >= entry->size) {
                 ret = -EINVAL;
                 break;
             }
 
             // Calculate the file position
-            loff_t new_f_pos = 0;
-            for (uint8_t i = 0; i < seekto->write_cmd; i++) {
+            new_f_pos = 0;
+            for (uint8_t i = 0; i < seekto.write_cmd; i++) {
                 uint8_t idx = (dev->buffer.out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
                 new_f_pos += dev->buffer.entry[idx].size;
             }
-            new_f_pos += seekto->write_cmd_offset;
+            new_f_pos += seekto.write_cmd_offset;
             filp->f_pos = new_f_pos;
             break;
         default:
@@ -250,7 +251,6 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
             break;
     }
     mutex_unlock(&dev->lock);
-    kfree(seekto);
     return ret;
 }
 
