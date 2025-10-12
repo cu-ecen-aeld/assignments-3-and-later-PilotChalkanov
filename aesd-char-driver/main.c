@@ -175,7 +175,8 @@ loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
 
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
-    for (uint8_t i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+    uint8_t i;
+    for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
         if (dev->buffer.entry[i].buffptr)
             buffer_size += dev->buffer.entry[i].size;
     }
