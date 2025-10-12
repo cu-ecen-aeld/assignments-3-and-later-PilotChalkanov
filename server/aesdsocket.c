@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include "thread_node.h"
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #ifndef USE_AESD_CHAR_DEVICE
 #define USE_AESD_CHAR_DEVICE 1
@@ -140,17 +141,48 @@ void * handle_client(void *arg) {
     ssize_t bytes_read;
 
     int client_id = node->client_fd;
+    int client_file_fd;
     while (1) {
         ssize_t bytes_received = recv(client_id, wbuffer, BUFFER_SIZE - 1, 0);
         if (bytes_received <= 0) {
             syslog(LOG_ERR, "recv error or connection closed");
-            return NULL;
+            break;
         }
         wbuffer[bytes_received] = '\0';
 
 #if USE_AESD_CHAR_DEVICE
-        int client_file_fd = open_file_for_write();
+        client_file_fd = open_file_for_write();
+#else
+        client_file_fd = node->file_fd;
 #endif
+
+        if (strncmp(wbuffer, "AESDCHAR_IOCSEEKTO:", 19) == 0) {
+            unsigned int x, y;
+            if (sscanf(wbuffer + 19, "%u,%u", &x, &y) == 2) {
+                struct aesd_seekto seekto;
+                seekto.write_cmd = x;
+                seekto.write_cmd_offset = y;
+
+                if(ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
+                    syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %s", strerror(errno));
+                    close(client_file_fd);
+                    break;
+                }
+
+                pthread_mutex_lock(&g_mutex);
+                while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
+                    if (send(client_id, rbuffer, bytes_read, 0) == -1) {
+                        syslog(LOG_ERR, "send error");
+                        pthread_mutex_unlock(&g_mutex);
+                        close(client_file_fd);
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&g_mutex);
+            }
+            close(client_file_fd);
+            continue;
+        }
 
         pthread_mutex_lock(&g_mutex);
         ssize_t bytes_written = write(client_file_fd, wbuffer, (size_t)bytes_received);
@@ -161,7 +193,6 @@ void * handle_client(void *arg) {
         }
 
         if (wbuffer[bytes_received - 1] == '\n') {
-            // Reopen file before every read
 #if USE_AESD_CHAR_DEVICE
             close(client_file_fd);
             client_file_fd = open_file_for_write();
@@ -177,7 +208,6 @@ void * handle_client(void *arg) {
             while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
                     syslog(LOG_ERR, "send error");
-                    printf("send error");
                     pthread_mutex_unlock(&g_mutex);
                     return NULL;
                 }
@@ -188,7 +218,6 @@ void * handle_client(void *arg) {
                 syslog(LOG_ERR, "Failed to read from file: %s", strerror(errno));
             }
 #if !USE_AESD_CHAR_DEVICE
-            // reset f position for next write(the whole file content should be returned each time)
             lseek(client_file_fd, 0, SEEK_END);
 #endif
         }
@@ -202,6 +231,7 @@ void * handle_client(void *arg) {
     node->is_completed = true;
     return NULL;
 }
+
 
 int main(int argc, char *argv[]) {
     int optval = 1;

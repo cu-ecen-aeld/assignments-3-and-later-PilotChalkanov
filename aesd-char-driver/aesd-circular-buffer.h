@@ -80,3 +80,5 @@ extern void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer);
 
 
 #endif /* AESD_CIRCULAR_BUFFER_H */
+
+uint8_t aesd_circular_buffer_get_full_count(struct aesd_circular_buffer *buffer);
