@@ -207,11 +207,14 @@ loff_t aesd_llseek(struct file *filp, loff_t offset, int whence) {
 
 
 long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
-
     struct aesd_dev *dev = filp->private_data;
     struct aesd_seekto seekto;
     long ret = 0;
     loff_t new_f_pos;
+    uint8_t num_entries;
+    uint8_t cmd_idx;
+    struct aesd_buffer_entry *entry;
+    uint8_t i;
 
     if (mutex_lock_interruptible(&dev->lock))
         return -ERESTARTSYS;
@@ -220,18 +223,19 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
         case AESDCHAR_IOCSEEKTO:
             PDEBUG("SEEK ioctl, arg=%lu", arg);
             if (copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto))) {
-                PDEBUG("seekto: write_cmd=%u, write_cmd_offset=%u", seekto.write_cmd, seekto.write_cmd_offset);
                 ret = -EFAULT;
                 break;
             }
-            uint8_t num_entries = aesd_circular_buffer_get_full_count(&dev->buffer);
+            PDEBUG("seekto: write_cmd=%u, write_cmd_offset=%u", seekto.write_cmd, seekto.write_cmd_offset);
+
+            num_entries = aesd_circular_buffer_get_full_count(&dev->buffer);
             if (seekto.write_cmd >= num_entries) {
                 ret = -EINVAL;
                 break;
             }
 
-            uint8_t cmd_idx = (dev->buffer.out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-            struct aesd_buffer_entry *entry = &dev->buffer.entry[cmd_idx];
+            cmd_idx = (dev->buffer.out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+            entry = &dev->buffer.entry[cmd_idx];
 
             if (seekto.write_cmd_offset >= entry->size) {
                 ret = -EINVAL;
@@ -240,7 +244,6 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 
             // Calculate the file position
             new_f_pos = 0;
-            uint8_t i;
             for (i = 0; i < seekto.write_cmd; i++) {
                 uint8_t idx = (dev->buffer.out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
                 new_f_pos += dev->buffer.entry[idx].size;
@@ -254,8 +257,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
     }
     mutex_unlock(&dev->lock);
     return ret;
-}
-
+};
 
 struct file_operations aesd_fops = {
     .owner = THIS_MODULE,
