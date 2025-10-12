@@ -146,7 +146,7 @@ void * handle_client(void *arg) {
         ssize_t bytes_received = recv(client_id, wbuffer, BUFFER_SIZE - 1, 0);
         if (bytes_received <= 0) {
             syslog(LOG_ERR, "recv error or connection closed");
-            return NULL;
+            break;
         }
         wbuffer[bytes_received] = '\0';
 
@@ -163,23 +163,23 @@ void * handle_client(void *arg) {
                 seekto.write_cmd = x;
                 seekto.write_cmd_offset = y;
 
-                int ret = ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, &seekto);
-                if (ret < 0) {
+                if(ioctl(client_file_fd, AESDCHAR_IOCSEEKTO, seekto) < 0) {
                     syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %s", strerror(errno));
-                    pthread_mutex_unlock(&g_mutex);
-                    return NULL;
+                    break;
                 }
 
                 pthread_mutex_lock(&g_mutex);
-                bytes_read = read(client_file_fd, rbuffer, offset);
-                if (send(client_id, rbuffer, bytes_read, 0) == -1) {
-                    syslog(LOG_ERR, "ioctl send error");
-                    pthread_mutex_unlock(&g_mutex);
-                    return NULL;
+                // Read and send all data after seek
+                bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE);
+                if (bytes_read> 0) {
+                    if (send(client_id, rbuffer, bytes_read, 0) == -1) {
+                        syslog(LOG_ERR, "ioctl send error");
+                        pthread_mutex_unlock(&g_mutex);
+                        break;
+                    }
                 }
                 pthread_mutex_unlock(&g_mutex);
             }
-
             continue; // skip write
         }
 
@@ -208,7 +208,6 @@ void * handle_client(void *arg) {
             while ((bytes_read = read(client_file_fd, rbuffer, BUFFER_SIZE)) > 0) {
                 if (send(client_id, rbuffer, bytes_read, 0) == -1) {
                     syslog(LOG_ERR, "send error");
-                    printf("send error");
                     pthread_mutex_unlock(&g_mutex);
                     return NULL;
                 }
