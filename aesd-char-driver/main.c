@@ -218,7 +218,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
     switch (cmd) {
         case AESDCHAR_IOCSEEKTO:
             PDEBUG("SEEK ioctl, arg=%lu", arg);
-            if (copy_from_user(seekto, (const void __user *)arg, sizeof(seekto))) {
+            if (copy_from_user(&seekto, (const void __user *)arg, sizeof(seekto))) {
                 PDEBUG("seekto: write_cmd=%u, write_cmd_offset=%u", seekto.write_cmd, seekto.write_cmd_offset);
                 ret = -EFAULT;
                 break;
