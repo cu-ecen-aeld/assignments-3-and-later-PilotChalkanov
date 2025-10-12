@@ -239,7 +239,8 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 
             // Calculate the file position
             new_f_pos = 0;
-            for (uint8_t i = 0; i < seekto.write_cmd; i++) {
+            uint8_t i;
+            for (i = 0; i < seekto.write_cmd; i++) {
                 uint8_t idx = (dev->buffer.out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
                 new_f_pos += dev->buffer.entry[idx].size;
             }
